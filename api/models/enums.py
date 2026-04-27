@@ -8,4 +8,8 @@ class ExperimentStatusEnum(str, Enum):
     DRAFT = "draft"
     RUNNING = "running"
     COMPLETED = "completed"
+
+class ExperimentModeEnum(str, Enum):
+    BAYESIAN = "bayesian"
+    FREQUENTIST = "frequentist"
     
