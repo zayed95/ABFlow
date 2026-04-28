@@ -1,0 +1,28 @@
+{
+    "config": {
+        "p_a": 0.1,
+        "p_b": 0.13,
+        "n_experiments": 1000,
+        "max_users": 5000,
+        "batch_size": 50
+    },
+    "fixed_horizon": {
+        "total_n": 3552
+    },
+    "default_rule": {
+        "power": 0.951,
+        "true_positives": 951,
+        "false_negatives": 49,
+        "median_sample_size": 650.0,
+        "stop_null": 38,
+        "never_stopped": 11
+    },
+    "loss_rule": {
+        "power": 0.961,
+        "true_positives": 961,
+        "false_negatives": 39,
+        "median_sample_size": 500.0,
+        "stop_null": 36,
+        "never_stopped": 3
+    }
+}
