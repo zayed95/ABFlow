@@ -2,7 +2,7 @@ from celery import shared_task
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from db.session import SessionLocal
-from db.models import Experiment, Assignment, Event, ExperimentStatus
+from db.models import Experiment, Assignment, Event, ExperimentStatus, PosteriorSnapshot
 from db.repositories import experiment_repo, posterior_repo
 from core.sequential.bayesian import BetaBinomialPosterior
 from core.sequential.decision import evaluate_decision, Decision
@@ -84,10 +84,17 @@ def update_posteriors_task(experiment_id: str):
         config = experiment.config
         alpha_prior = config.get("alpha_prior", 1.0)
         beta_prior = config.get("beta_prior", 1.0)
+        prior_type = config.get("prior_type", "uniform")
+        historical_cr = config.get("historical_cr")
 
         # Helper to hydrate posterior from DB snapshot or prior
         def hydrate_posterior(snap):
-            p = BetaBinomialPosterior(alpha_prior=alpha_prior, beta_prior=beta_prior)
+            p = BetaBinomialPosterior(
+                prior_type=prior_type,
+                historical_cr=historical_cr,
+                alpha_prior=alpha_prior, 
+                beta_prior=beta_prior
+            )
             if snap:
                 p.alpha_posterior = snap.alpha_post
                 p.beta_posterior = snap.beta_post

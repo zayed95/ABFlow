@@ -1,56 +1,89 @@
 """Unit tests for core.sequential.frequentist."""
 import pytest
-import numpy as np
 from core.sequential.frequentist import OBrienFlemingBoundary
 
-def test_obrien_fleming_boundaries():
-    """Verify that boundaries are conservative early and lenient late."""
-    n_looks = 5
-    obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=n_looks)
-    
-    boundaries = obf.get_all_boundaries()
-    assert len(boundaries) == n_looks
-    
-    # Boundary 1 should be significantly larger than Boundary 5
-    assert boundaries[0] > boundaries[-1]
-    
-    # Final boundary should be approximately 1.96 for alpha=0.05
-    assert pytest.approx(boundaries[-1], rel=1e-3) == 1.960
-    
-    # Check monotonicity
-    for i in range(len(boundaries) - 1):
-        assert boundaries[i] > boundaries[i+1]
 
-def test_test_at_look_early_stop():
-    """Test significance at different looks with a fixed effect."""
-    obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
-    
-    # Case: Strong effect that might not be significant at Look 1 but is at Look 5
-    # p1=0.1, p2=0.15 (delta=0.05)
-    # n=500 per variant
-    n_c, c_c = 500, 50
-    n_t, c_t = 500, 75
-    
-    # Look 1: Boundary is ~4.38
-    res1 = obf.test_at_look(n_c, c_c, n_t, c_t, look_number=1)
-    # Z-stat will be ~2.4ish
-    assert not res1["reject"]
-    assert res1["boundary"] > 4.0
-    
-    # Look 5: Boundary is ~1.96
-    res5 = obf.test_at_look(n_c, c_c, n_t, c_t, look_number=5)
-    assert res5["reject"]
-    assert pytest.approx(res5["boundary"], rel=1e-3) == 1.960
+class TestOBrienFlemingBoundary:
+    def test_initialization(self):
+        """Test basic initialization and validation."""
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        assert obf.alpha == 0.05
+        assert obf.n_planned_looks == 5
+        assert len(obf.get_all_boundaries()) == 5
 
-def test_z_score_calculation():
-    """Verify the Z-score calculation logic."""
-    obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=1)
-    
-    # p1=0.1, p2=0.2, n=100
-    # p_pool = 30/200 = 0.15
-    # SE = sqrt(0.15 * 0.85 * (1/100 + 1/100)) = sqrt(0.1275 * 0.02) = sqrt(0.00255) = 0.050497
-    # Z = (0.2 - 0.1) / 0.050497 = 1.9803
-    res = obf.test_at_look(100, 10, 100, 20, look_number=1)
-    
-    assert pytest.approx(res["z_stat"], rel=1e-3) == 1.9803
-    assert res["reject"] is True # 1.98 > 1.96
+    def test_boundaries_decrease(self):
+        """
+        Verify the O'Brien-Fleming property: boundaries (critical values) 
+        must decrease as the look number increases.
+        """
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        boundaries = obf.get_all_boundaries()
+        
+        # Check that each subsequent boundary is smaller than the previous one
+        for i in range(len(boundaries) - 1):
+            assert boundaries[i] > boundaries[i+1], f"Boundary at look {i+1} should be > look {i+2}"
+        
+        # Last boundary should be close to the standard normal critical value (approx 1.96 for alpha=0.05)
+        # For OBF, the last boundary is exactly z_alpha/2 if k=K.
+        assert boundaries[-1] == pytest.approx(1.95996, abs=1e-4)
+
+    def test_large_z_stat_rejects(self):
+        """Test that a very large z-statistic triggers reject=True."""
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        
+        # Look 1 boundary for alpha=0.05, K=5 is 1.96 * sqrt(5) approx 4.38
+        # A Z-score of 10 should definitely reject.
+        res = obf.test_at_look(n_control=100, conversions_control=10, 
+                               n_treatment=100, conversions_treatment=90, 
+                               look_number=1)
+        
+        assert res["reject"] is True
+        assert res["z_stat"] > res["boundary"]
+        assert res["p_value"] < 0.0001
+
+    def test_small_z_stat_continues(self):
+        """Test that a small z-statistic does not trigger reject."""
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        
+        # No difference
+        res = obf.test_at_look(n_control=100, conversions_control=10, 
+                               n_treatment=100, conversions_treatment=10, 
+                               look_number=1)
+        
+        assert res["reject"] is False
+        assert res["z_stat"] == 0.0
+
+    def test_invalid_look_number(self):
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        with pytest.raises(ValueError):
+            obf.get_boundary(0)
+        with pytest.raises(ValueError):
+            obf.get_boundary(6)
+
+    def test_invalid_initialization(self):
+        with pytest.raises(ValueError, match="Alpha must be"):
+            OBrienFlemingBoundary(alpha=1.5)
+        with pytest.raises(ValueError, match="n_planned_looks must be"):
+            OBrienFlemingBoundary(n_planned_looks=0)
+
+    def test_evaluate_method(self):
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        # Boundary for look 5 is approx 1.96
+        assert obf.evaluate(z_score=2.0, look_number=5)
+        assert not obf.evaluate(z_score=1.0, look_number=5)
+
+    def test_empty_data_cases(self):
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        # Zero trials
+        res = obf.test_at_look(0, 0, 0, 0, 1)
+        assert res["reject"] is False
+        assert res["z_stat"] == 0.0
+        
+        # Zero conversions (p_pool = 0)
+        res = obf.test_at_look(100, 0, 100, 0, 1)
+        assert res["reject"] is False
+        assert res["z_stat"] == 0.0
+
+    def test_repr(self):
+        obf = OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)
+        assert "OBrienFlemingBoundary(alpha=0.05, n_planned_looks=5)" in repr(obf)

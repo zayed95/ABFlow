@@ -16,18 +16,53 @@ class BetaBinomialPosterior:
     """
     Beta-Binomial posterior distribution for modeling binary outcomes (success/failure).
     Uses a Beta distribution as the conjugate prior for a Binomial likelihood.
-    """
-    def __init__(self, alpha_prior: float = 1, beta_prior: float = 1):
-        """
-        Initialize the Beta prior and posterior.
 
-        Args:
-            alpha_prior: Prior alpha parameter (pseudo-successes). Defaults to 1 (Uniform prior).
-            beta_prior:  Prior beta parameter (pseudo-failures).  Defaults to 1 (Uniform prior).
-        """
-        # Store the original priors so they can be inspected or used to reset.
-        self.alpha_prior = float(alpha_prior)
-        self.beta_prior = float(beta_prior)
+    Prior Choice Tradeoffs (Project Defense Material):
+    - Uniform Prior ('uniform', alpha=1, beta=1):
+        Represents "complete ignorance" (Bayes' original suggestion). It assigns equal probability 
+        density to all possible conversion rates in [0, 1]. It is a mathematically convenient 
+        starting point but can be slightly "opinionated" in small samples by pulling the 
+        posterior towards 0.5.
+    - Jeffreys Prior ('jeffreys', alpha=0.5, beta=0.5):
+        The non-informative prior that is invariant under reparameterization. It places more 
+        weight near 0 and 1, where many conversion rates naturally reside. It often provides 
+        better frequentist properties (like coverage) than the Uniform prior and is generally 
+        preferred for objective Bayesian analysis.
+    - Informed Prior ('informed', alpha=2, beta=1/cr - 2):
+        Used when historical baseline conversion rate (CR) data is available. By centering the 
+        prior around the known CR, we reduce the "initialization bias" and reach statistical 
+        significance faster. 
+        We use the hardcoded default Beta(2, 1/cr - 2) which:
+        1. Centers the mode near the historical CR.
+        2. Provides a modest "pseudo-sample" weight (strength of belief), preventing the 
+           prior from being too rigid while still offering a helpful head start.
+    """
+    def __init__(
+        self, 
+        prior_type: str = None, 
+        historical_cr: float = None,
+        alpha_prior: float = 1.0, 
+        beta_prior: float = 1.0,
+    ):
+        if prior_type == 'uniform':
+            self.alpha_prior = 1.0
+            self.beta_prior = 1.0
+        elif prior_type == 'jeffreys':
+            self.alpha_prior = 0.5
+            self.beta_prior = 0.5
+        elif prior_type == 'informed':
+            if historical_cr is None:
+                raise ValueError("historical_cr must be provided for 'informed' prior_type")
+            if not (0 < historical_cr < 0.5):
+                # beta = 1/cr - 2 must be > 0
+                raise ValueError(f"historical_cr must be in (0, 0.5) for the default informed prior, got {historical_cr}")
+            
+            self.alpha_prior = 2.0
+            self.beta_prior = (1.0 / historical_cr) - 2.0
+        else:
+            # Fallback to provided alpha/beta if prior_type is None or 'custom'
+            self.alpha_prior = alpha_prior
+            self.beta_prior = beta_prior
 
         # Posteriors start equal to the priors; they are updated as data arrives.
         self.alpha_posterior = self.alpha_prior
@@ -69,11 +104,7 @@ class BetaBinomialPosterior:
         )
 
     def mean(self) -> float:
-        """
-        Return the expected conversion rate of the posterior Beta distribution.
-
-        Computed as alpha_posterior / (alpha_posterior + beta_posterior).
-        """
+        # Return the expected conversion rate of the posterior Beta distribution.
         return self.alpha_posterior / (self.alpha_posterior + self.beta_posterior)
 
     @property
