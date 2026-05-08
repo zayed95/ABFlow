@@ -5,6 +5,7 @@ import pickle
 from typing import Dict, Any, Optional, Union, List, Tuple
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.utils.validation import check_is_fitted
 from .features import FeatureExtractor
 
 # Configure logging
@@ -84,6 +85,12 @@ class ClusteringModel:
         """
         if self.kmeans is None:
             raise RuntimeError("ClusteringModel must be fitted before calling predict().")
+        
+        try:
+            check_is_fitted(self.kmeans)
+        except Exception:
+            raise RuntimeError("ClusteringModel must be fitted before calling predict().")
+            
         return self.kmeans.predict(X)
 
     def cluster_summary(self, feature_names: Optional[List[str]] = None) -> pd.DataFrame:
@@ -110,6 +117,11 @@ class ClusteringModel:
         Serializes the fitted model state.
         """
         if self.kmeans is None:
+            raise RuntimeError("Model must be fitted before saving.")
+            
+        try:
+            check_is_fitted(self.kmeans)
+        except Exception:
             raise RuntimeError("Model must be fitted before saving.")
         
         state = {
