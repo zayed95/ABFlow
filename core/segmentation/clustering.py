@@ -28,6 +28,7 @@ class ClusteringModel:
         self.n_clusters = n_clusters
         self.kmeans: Optional[KMeans] = None
         self.cluster_sizes_: Dict[int, int] = {}
+        self.silhouette_score_: float = 0.0
         
         if n_clusters is not None:
             self.kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
@@ -55,6 +56,7 @@ class ClusteringModel:
                 best_k = k
 
         self.n_clusters = best_k
+        self.silhouette_score_ = best_score
         logger.info(f"Optimal K found: {best_k} with score {best_score:.4f}")
         return best_k
 
@@ -72,8 +74,15 @@ class ClusteringModel:
         self.kmeans = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
         self.kmeans.fit(X)
         
+        # Calculate silhouette score for the final fitted model
+        labels = self.kmeans.labels_
+        if len(np.unique(labels)) > 1:
+            self.silhouette_score_ = silhouette_score(X, labels)
+        else:
+            self.silhouette_score_ = 0.0
+            
         # Store cluster sizes from training data
-        unique, counts = np.unique(self.kmeans.labels_, return_counts=True)
+        unique, counts = np.unique(labels, return_counts=True)
         self.cluster_sizes_ = dict(zip(unique.tolist(), counts.tolist()))
         
         return self
@@ -126,7 +135,8 @@ class ClusteringModel:
         
         state = {
             'kmeans': self.kmeans,
-            'cluster_sizes': self.cluster_sizes_
+            'cluster_sizes': self.cluster_sizes_,
+            'silhouette_score': self.silhouette_score_
         }
         with open(path, 'wb') as f:
             pickle.dump(state, f)
@@ -143,6 +153,7 @@ class ClusteringModel:
         instance = cls(n_clusters=kmeans_obj.n_clusters)
         instance.kmeans = kmeans_obj
         instance.cluster_sizes_ = state.get('cluster_sizes', {})
+        instance.silhouette_score_ = state.get('silhouette_score', 0.0)
         return instance
 
     def save_artifacts(self, extractor: FeatureExtractor) -> bytes:
@@ -156,6 +167,7 @@ class ClusteringModel:
         state = {
             'kmeans': self.kmeans,
             'cluster_sizes': self.cluster_sizes_,
+            'silhouette_score': self.silhouette_score_,
             'extractor': extractor
         }
         return pickle.dumps(state)
@@ -174,5 +186,6 @@ class ClusteringModel:
         instance = cls(n_clusters=kmeans_obj.n_clusters)
         instance.kmeans = kmeans_obj
         instance.cluster_sizes_ = state.get('cluster_sizes', {})
+        instance.silhouette_score_ = state.get('silhouette_score', 0.0)
         
         return instance, state['extractor']

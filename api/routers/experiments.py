@@ -4,6 +4,7 @@ import uuid
 from db.session import get_db
 from api.schemas import ExperimentCreate, ExperimentResponse
 from db.repositories import experiment_repo
+from services import experiment_service
 
 experiment_router = APIRouter(prefix="/experiments", tags=["experiments"])
 
@@ -23,6 +24,19 @@ def get_experiment_details(experiment_id: uuid.UUID, db: Session = Depends(get_d
     Returns 404 if the experiment does not exist.
     """
     db_experiment = experiment_repo.get_experiment(db, experiment_id)
+    if db_experiment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Experiment not found"
+        )
+    return db_experiment
+
+@experiment_router.post("/{experiment_id}/start", response_model=ExperimentResponse)
+def start_experiment_endpoint(experiment_id: uuid.UUID, db: Session = Depends(get_db)):
+    """
+    Triggers the start of an experiment and its segmentation training.
+    """
+    db_experiment = experiment_service.start_experiment(db, str(experiment_id))
     if db_experiment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
