@@ -64,9 +64,11 @@ class FeatureExtractor:
         # Cleanup intermediate columns
         features = features.drop(columns=['last_event', 'conversions'])
 
+        # Robustness check: handle any potential inf or NaN
+        features = features.replace([np.inf, -np.inf], 0.0).fillna(0.0)
+
         # Ensure column order and return
         cols_order = ['recency', 'frequency', 'monetary', 'session_depth', 'conversion_rate']
-        # Add any other columns that might have been aggregated if we had more features
         return features.reset_index()[['user_id'] + cols_order]
 
     def fit_transform(self, user_events: pd.DataFrame) -> np.ndarray:
