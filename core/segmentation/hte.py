@@ -67,3 +67,52 @@ def run_segment_test(control: SegmentMetric, treatment: SegmentMetric) -> Segmen
         corrected_p_value=None,  # To be filled in subsequent steps
         significant=bool(p_value < 0.05)
     )
+
+def apply_bh_correction(results: list[SegmentTestResult], alpha=0.05) -> list[SegmentTestResult]:
+    """
+    Applies the Benjamini-Hochberg (BH) procedure to control the False Discovery Rate (FDR).
+    
+    Why BH instead of Bonferroni?
+    -----------------------------
+    Bonferroni correction controls the Family-Wise Error Rate (FWER), which is the 
+    probability of making AT LEAST ONE false positive. This is extremely conservative 
+    when the number of tests (k) is large, often leading to high false negative rates.
+    
+    Benjamini-Hochberg controls the False Discovery Rate (FDR), which is the expected 
+    proportion of "discoveries" (significant results) that are actually false positives. 
+    BH is significantly more powerful than Bonferroni, especially when k > 3, as it 
+    allows for some false positives in exchange for a much higher discovery rate.
+    
+    1. Sort results by raw_p_value ascending.
+    2. Identify the largest rank i where p_value <= (i/m) * alpha.
+    3. Flag all tests with rank <= i as significant.
+    4. Compute corrected p-values.
+    
+    :param results: List of SegmentTestResult objects
+    :param alpha: Target FDR level (default 0.05)
+    :return: List of results with updated corrected_p_value and significant flag.
+    """
+    m = len(results)
+    if m == 0:
+        return []
+
+    # Sort results by raw p-value to determine ranks
+    # We use a temporary list with original indices to restore order later
+    indexed_results = sorted(enumerate(results), key=lambda x: x[1].raw_p_value)
+    
+    # Find the largest rank i where p_i <= (i/m) * alpha
+    max_i = -1
+    for i, (_, res) in enumerate(indexed_results, start=1):
+        threshold = (i / m) * alpha
+        if res.raw_p_value <= threshold:
+            max_i = i
+
+    # Update corrected p-values and significance
+    # Formula for corrected p-value: min(raw_p_value * m / rank, 1.0)
+    for i, (_, res) in enumerate(indexed_results, start=1):
+        res.corrected_p_value = min(res.raw_p_value * m / i, 1.0)
+        res.significant = (i <= max_i) if max_i != -1 else False
+
+    # Restore original order
+    sorted_by_index = sorted(indexed_results, key=lambda x: x[0])
+    return [res for _, res in sorted_by_index]
