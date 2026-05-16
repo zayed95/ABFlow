@@ -12,21 +12,6 @@ from tasks.train_segmentation import train_segmentation_task
 
 client = TestClient(app)
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_database():
-    """Ensure tables are created before running tests."""
-    Base.metadata.create_all(bind=engine)
-    yield
-    # Base.metadata.drop_all(bind=engine)
-
-@pytest.fixture
-def db_session():
-    """Provides a transactional database session for each test."""
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
 
 def seed_user_profiles(db, exp_id, start_idx, n_users, profile_type, ref_time):
     """

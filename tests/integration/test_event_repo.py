@@ -5,18 +5,6 @@ from db.session import SessionLocal, engine
 from db.models import Base, Experiment, Assignment, Event, ExperimentStatus
 from db.repositories import event_repo, experiment_repo, assignment_repo
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_database():
-    Base.metadata.create_all(bind=engine)
-    yield
-
-@pytest.fixture
-def db_session():
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
 
 def test_get_segment_metrics(db_session):
     # 1. Create Experiment

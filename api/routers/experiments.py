@@ -144,10 +144,10 @@ def get_experiment_results(experiment_id: uuid.UUID, db: Session = Depends(get_d
 
 @experiment_router.get("/{experiment_id}/segments", response_model=List[SegmentProfile])
 def get_segment_profiles(experiment_id: uuid.UUID, db: Session = Depends(get_db)):
-    \"\"\"
+    """
     Returns a summary of segment profiles for an experiment.
     Labels segments as 'high_value', 'new_user', or 'casual' based on centroid features.
-    \"\"\"
+    """
     from db.repositories import assignment_repo
     from core.segmentation import ClusteringModel
     import pandas as pd
