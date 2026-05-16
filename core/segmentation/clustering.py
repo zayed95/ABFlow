@@ -189,3 +189,41 @@ class ClusteringModel:
         instance.silhouette_score_ = state.get('silhouette_score', 0.0)
         
         return instance, state['extractor']
+    @staticmethod
+    def label_clusters(centroids: pd.DataFrame) -> Dict[int, str]:
+        """
+        Assigns human-readable labels to clusters based on centroid values.
+        
+        Logic:
+        - 'high_value': Cluster with the highest 'monetary' centroid.
+        - 'new_user': Cluster with the highest 'recency' centroid.
+        - 'casual': All remaining clusters.
+        
+        Args:
+            centroids: DataFrame containing inverse-transformed centroid values.
+            
+        Returns:
+            Dict[int, str]: Mapping of cluster index to label.
+        """
+        labels = {}
+        # Ensure we use the correct column names from FeatureExtractor
+        monetary_col = 'monetary'
+        recency_col = 'recency'
+        
+        if monetary_col not in centroids.columns or recency_col not in centroids.columns:
+            # Fallback if columns are missing or named differently
+            for i in range(len(centroids)):
+                labels[i] = f"segment_{i}"
+            return labels
+
+        high_value_idx = centroids[monetary_col].idxmax()
+        new_user_idx = centroids[recency_col].idxmax()
+        
+        for i in range(len(centroids)):
+            if i == high_value_idx:
+                labels[i] = "high_value"
+            elif i == new_user_idx:
+                labels[i] = "new_user"
+            else:
+                labels[i] = "casual"
+        return labels

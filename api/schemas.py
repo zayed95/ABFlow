@@ -31,3 +31,47 @@ class AssignmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+class SegmentResult(BaseModel):
+    segment_id: Optional[int]
+    n_control: int
+    n_treatment: int
+    cr_control: float
+    cr_treatment: float
+    delta: float
+    relative_lift: float
+    ci_lower: float
+    ci_upper: float
+    corrected_p_value: Optional[float]
+    significant: bool
+
+    class Config:
+        from_attributes = True
+
+class PosteriorStateSchema(BaseModel):
+    alpha_posterior: float
+    beta_posterior: float
+    expected_value: float
+    variance: float
+
+class OverallResults(BaseModel):
+    control: PosteriorStateSchema
+    treatment: PosteriorStateSchema
+    prob_b_beats_a: float
+    decision: str
+
+class ResultsResponse(BaseModel):
+    overall: Optional[OverallResults] = None
+    segment_results: Optional[list[SegmentResult]] = None
+    n_segments: Optional[int] = None
+    n_significant_segments: int
+
+    class Config:
+        from_attributes = True
+
+class SegmentProfile(BaseModel):
+    segment_id: int
+    label: str
+    centroids: dict[str, float]
+
+    class Config:
+        from_attributes = True
