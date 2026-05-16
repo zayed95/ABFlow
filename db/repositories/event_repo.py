@@ -30,17 +30,28 @@ def get_segment_metrics(db: Session, experiment_id: uuid.UUID) -> list[SegmentMe
     :param experiment_id: UUID of the experiment
     :return: List of SegmentMetric objects
     """
-    # Single query joining assignments and events on (experiment_id, user_id)
+    # Aggregate conversions per user first to avoid row multiplication in the join
+    user_conversions = (
+        db.query(
+            Event.user_id,
+            func.sum(case((Event.event_type == 'conversion', 1), else_=0)).label('conversions')
+        )
+        .filter(Event.experiment_id == experiment_id)
+        .group_by(Event.user_id)
+        .subquery()
+    )
+
+    # Join assignments with aggregated user conversions
     results = (
         db.query(
             Assignment.segment_id,
             Assignment.variant,
-            func.count(distinct(Assignment.user_id)).label('n_users'),
-            func.sum(case((Event.event_type == 'conversion', 1), else_=0)).label('n_conversions')
+            func.count(Assignment.user_id).label('n_users'),
+            func.sum(func.coalesce(user_conversions.c.conversions, 0)).label('n_conversions')
         )
         .outerjoin(
-            Event,
-            (Assignment.user_id == Event.user_id) & (Assignment.experiment_id == Event.experiment_id)
+            user_conversions,
+            Assignment.user_id == user_conversions.c.user_id
         )
         .filter(Assignment.experiment_id == experiment_id)
         .group_by(Assignment.segment_id, Assignment.variant)

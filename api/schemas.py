@@ -64,6 +64,7 @@ class ResultsResponse(BaseModel):
     segment_results: Optional[list[SegmentResult]] = None
     n_segments: Optional[int] = None
     n_significant_segments: int
+    warnings: list[str] = []
 
     class Config:
         from_attributes = True

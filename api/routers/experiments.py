@@ -117,6 +117,23 @@ def get_experiment_results(experiment_id: uuid.UUID, db: Session = Depends(get_d
     # 3. Fetch Per-Segment Metrics
     segment_metrics = event_repo.get_segment_metrics(db, experiment_id)
     
+    # Identify excluded segments for warnings
+    from db.models import Assignment
+    all_assigned_segments = [
+        r[0] for r in db.query(Assignment.segment_id)
+        .filter(Assignment.experiment_id == experiment_id)
+        .distinct().all() 
+        if r[0] is not None
+    ]
+    included_segments = {m.segment_id for m in segment_metrics}
+    
+    warnings = []
+    for seg_id in all_assigned_segments:
+        if seg_id not in included_segments:
+            warnings.append(
+                f"Segment {seg_id} excluded from HTE analysis due to insufficient sample size (< 30 users per variant)."
+            )
+
     # 4. Compute HTE for each segment
     segment_results = []
     metrics_by_segment = defaultdict(dict)
@@ -139,7 +156,8 @@ def get_experiment_results(experiment_id: uuid.UUID, db: Session = Depends(get_d
         "overall": overall_results,
         "segment_results": segment_results,
         "n_segments": len(segment_results),
-        "n_significant_segments": n_significant
+        "n_significant_segments": n_significant,
+        "warnings": warnings
     }
 
 @experiment_router.get("/{experiment_id}/segments", response_model=List[SegmentProfile])

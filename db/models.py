@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, DateTime, Enum, ForeignKey, UniqueConstraint, LargeBinary, JSON, Uuid
+from sqlalchemy import String, Integer, Float, DateTime, Enum, ForeignKey, UniqueConstraint, LargeBinary, JSON, Uuid, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
 
 class Base(DeclarativeBase):
@@ -56,6 +56,10 @@ class Event(Base):
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     metric_value: Mapped[float] = mapped_column(Float, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_event_experiment_user", "experiment_id", "user_id"),
+    )
 
 class SegmentModel(Base):
     __tablename__ = "segment_models"
