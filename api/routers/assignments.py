@@ -43,43 +43,47 @@ def enroll_user(enrollment: AssignmentEnroll, db: Session = Depends(get_db)):
     # 3. Determine variant
     variant = get_variant(enrollment.user_id, experiment.seed)
 
-    # 4. Optional Segment Assignment
+    # 4. Feature Extraction and Optional Segment Assignment
     segment_id = None
+    user_features = {}
     segment_model_record = assignment_repo.get_segment_model(db, enrollment.experiment_id)
     
-    if segment_model_record:
-        try:
-            # Fetch historical events for this user (before experiment creation)
-            user_events = db.query(Event).filter(
-                Event.experiment_id == enrollment.experiment_id,
-                Event.user_id == enrollment.user_id,
-                Event.occurred_at < experiment.created_at
-            ).all()
+    try:
+        # Fetch historical events for this user (before experiment creation)
+        user_events = db.query(Event).filter(
+            Event.experiment_id == enrollment.experiment_id,
+            Event.user_id == enrollment.user_id,
+            Event.occurred_at < experiment.created_at
+        ).all()
 
-            user_features = {}
-            if user_events:
-                # Prepare raw event data for extraction
-                df_events = pd.DataFrame([{
-                    'user_id': e.user_id,
-                    'occurred_at': e.occurred_at,
-                    'metric_value': e.metric_value,
-                    'event_type': e.event_type,
-                    'session_id': getattr(e, 'session_id', None)
-                } for e in user_events])
+        if user_events:
+            # Prepare raw event data for extraction
+            df_events = pd.DataFrame([{
+                'user_id': e.user_id,
+                'occurred_at': e.occurred_at,
+                'metric_value': e.metric_value,
+                'event_type': e.event_type,
+                'session_id': getattr(e, 'session_id', None)
+            } for e in user_events])
 
-                # Extract features from available events
+            if segment_model_record:
                 _, extractor = ClusteringModel.load_artifacts(segment_model_record.kmeans_artifact)
-                features_df = extractor.extract(df_events)
-                
-                if not features_df.empty:
-                    # Convert to dict (excluding user_id)
-                    user_features = features_df.drop(columns=['user_id']).iloc[0].to_dict()
+            else:
+                from core.segmentation.features import FeatureExtractor
+                extractor = FeatureExtractor()
 
+            features_df = extractor.extract(df_events)
+            
+            if not features_df.empty:
+                # Convert to dict (excluding user_id)
+                user_features = features_df.drop(columns=['user_id']).iloc[0].to_dict()
+
+        if segment_model_record:
             # Perform assignment (will use imputation if user_features is empty or incomplete)
             segment_id = assign_segment(user_features, segment_model_record)
-        except Exception:
-            # Fallback: segment_id remains None if processing fails catastrophically
-            pass
+    except Exception:
+        # Fallback: segment_id remains None, user_features might be empty if processing fails catastrophically
+        pass
 
     # 5. Create assignment
     return assignment_repo.create_assignment(
@@ -87,5 +91,6 @@ def enroll_user(enrollment: AssignmentEnroll, db: Session = Depends(get_db)):
         enrollment.experiment_id, 
         enrollment.user_id, 
         variant, 
-        segment_id
+        segment_id=segment_id,
+        features=user_features
     )

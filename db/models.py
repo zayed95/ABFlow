@@ -21,6 +21,7 @@ class Experiment(Base):
     status: Mapped[ExperimentStatus] = mapped_column(Enum(ExperimentStatus), nullable=False, default=ExperimentStatus.draft)
     config: Mapped[dict] = mapped_column(JSON, nullable=False)  # stores MDE, alpha, feature_schema, decision_threshold
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
 
 class Assignment(Base):
@@ -31,6 +32,7 @@ class Assignment(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     variant: Mapped[str] = mapped_column(String, nullable=False)  # control/treatment
     segment_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    features: Mapped[dict] = mapped_column(JSON, nullable=True)
     enrolled_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (

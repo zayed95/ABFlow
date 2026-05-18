@@ -11,7 +11,7 @@ def get_assignment(db: Session, experiment_id: uuid.UUID, user_id: str) -> Assig
         Assignment.user_id == user_id
     ).first()
 
-def create_assignment(db: Session, experiment_id: uuid.UUID, user_id: str, variant: str, segment_id: int = None) -> Assignment:
+def create_assignment(db: Session, experiment_id: uuid.UUID, user_id: str, variant: str, segment_id: int = None, features: dict = None) -> Assignment:
     """
     Creates a new assignment record.
     """
@@ -19,7 +19,8 @@ def create_assignment(db: Session, experiment_id: uuid.UUID, user_id: str, varia
         experiment_id=experiment_id,
         user_id=user_id,
         variant=variant,
-        segment_id=segment_id
+        segment_id=segment_id,
+        features=features
     )
     db.add(db_assignment)
     db.commit()

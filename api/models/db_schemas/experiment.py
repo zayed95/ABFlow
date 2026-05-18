@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator, ConfigDict
 class ExperimentConfig(BaseModel):
     prior_type: Literal['uniform', 'jeffreys', 'informed'] = Field(default='uniform')
     historical_cr: Optional[float] = None
+    outcome_window_hours: int = Field(default=72)
     
     model_config = ConfigDict(extra='allow')
 
